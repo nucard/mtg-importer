@@ -9,16 +9,25 @@ firebase.initializeApp({
 });
 const db = firebase.firestore();
 
-function deleteAllCards() {
+function getAllCards() {
     return new Promise((resolve, reject) => {
-        const cards = db
+        db
             .collection('cards')
             .get()
             .then(snapshot => {
+                resolve(snapshot.docs);
+            });
+    });
+}
+
+function deleteAllCards() {
+    return new Promise((resolve, reject) => {
+        getAllCards()
+            .then(docs => {
                 const batch = db.batch();
 
-                console.log(`Deleting ${snapshot.size} cards...`);
-                snapshot.docs.forEach(doc => {
+                console.log(`Deleting ${docs.length} cards...`);
+                docs.forEach(doc => {
                     batch.delete(doc.ref);
                 });
 
@@ -44,6 +53,7 @@ function importCards() {
                 if (!card) {
                     const newCard = {
                         id: setCard.id,
+                        searchId: setCard.name.toLowerCase().replace(' ', ''), // for algolia search
                         name: setCard.name,
                         rarity: setCard.rarity,
                         cost: setCard.manaCost || null,
@@ -72,23 +82,41 @@ function importCards() {
             }
         }
 
-        console.log(`Adding ${_.keys(cards.length)} cards...`);
-        const batch = db.batch();
-
+        const allBatches = [];
         const cardValues = _.values(cards);
-        for (let card of cardValues) {
+        let batch = db.batch();
+        let batchCounter = 0;
+
+        console.log(`Adding ${cardValues.length} cards...`);
+        for (let i = 0; i < cardValues.length; i++) {
             const cardRef = db.collection('cards').doc();
-            batch.set(cardRef, card);
+            batch.set(cardRef, cardValues[i]);
+            batchCounter++;
+
+            if (batchCounter === 500 || i === cardValues.length - 1) {
+                allBatches.push(batch);
+                batch = db.batch();
+                batchCounter = 0;
+            }
         }
 
-        batch.commit().then(nailedIt => {
-            console.log('Done.');
-            resolve(cardValues);
-        })
+        for (let batch of allBatches) {
+            batch.commit();
+        }
+
+        console.log('Done.');
+        resolve(cardValues);
     });
 }
 
-async function createSearchIndex(cards) {
+async function createSearchIndex() {
+    const cards = [];
+    getAllCards().then(docs => {
+        docs.forEach(doc => {
+            cards.push(doc.data());
+        })
+    });
+
     // assign cards an objectId for algolia
     for (const card of cards) {
         card.objectId = card.name.toLowerCase().replace(' ', '');
@@ -100,5 +128,6 @@ async function createSearchIndex(cards) {
 
 (async () => {
     await deleteAllCards();
-    await createSearchIndex(await importCards());
+    await importCards();
+    await createSearchIndex();
 })();
