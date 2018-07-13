@@ -111,10 +111,9 @@ function importCards() {
 
 async function createSearchIndex() {
     const cards = [];
-    getAllCards().then(docs => {
-        docs.forEach(doc => {
-            cards.push(doc.data());
-        })
+    const cardDocs = await getAllCards();
+    docs.forEach(doc => {
+        cards.push(doc.data());
     });
 
     // assign cards an objectId for algolia
@@ -127,7 +126,7 @@ async function createSearchIndex() {
 }
 
 (async () => {
-    await deleteAllCards();
-    await importCards();
+    // await deleteAllCards();
+    // await importCards();
     await createSearchIndex();
 })();
