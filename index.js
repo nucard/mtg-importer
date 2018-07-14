@@ -109,16 +109,20 @@ function importCards() {
     });
 }
 
-async function createSearchIndex() {
-    const cards = [];
-    const cardDocs = await getAllCards();
-    docs.forEach(doc => {
-        cards.push(doc.data());
-    });
+async function createSearchIndex(cards) {
+    cards = cards || [];
 
-    // assign cards an objectId for algolia
+    // if we don't have the cards locally, go get them
+    if (!cards.length) {
+        const cardDocs = await getAllCards();
+        cardDocs.forEach(doc => {
+            cards.push(doc.data());
+        });
+    }
+
+    // assign cards an objectID (note spelling) for algolia
     for (const card of cards) {
-        card.objectId = card.name.toLowerCase().replace(' ', '');
+        card.objectID = card.name.toLowerCase().replace(' ', '');
     }
 
     const indexingService = new IndexingService();
@@ -127,6 +131,6 @@ async function createSearchIndex() {
 
 (async () => {
     // await deleteAllCards();
-    // await importCards();
+    // const cards = await importCards();
     await createSearchIndex();
 })();
