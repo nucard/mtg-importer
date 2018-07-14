@@ -39,6 +39,13 @@ function deleteAllCards() {
     })
 }
 
+function getCardSearchId(cardName) {
+    return cardName
+        .toLowerCase()
+        .split(' ')
+        .join('');
+}
+
 function loadCardData() {
     const cards = {};
 
@@ -52,7 +59,7 @@ function loadCardData() {
             if (!card) {
                 const newCard = {
                     id: setCard.id,
-                    searchId: setCard.name.toLowerCase().replace(' ', ''), // for algolia search
+                    searchId: getCardSearchId(setCard.name), // for algolia search
                     name: setCard.name,
                     rarity: setCard.rarity,
                     cost: setCard.manaCost || null,
@@ -93,7 +100,7 @@ function importCards(cards) {
 
         console.log(`Adding ${cards.length} cards...`);
         for (let i = 0; i < cards.length; i++) {
-            const cardRef = db.collection('cards').doc();
+            const cardRef = db.collection('cards').doc(cards[i].id);
             batch.set(cardRef, cards[i]);
             batchCounter++;
 
@@ -114,18 +121,25 @@ function importCards(cards) {
 }
 
 async function createSearchIndex(cards) {
-    // assign cards an objectID (note spelling) for algolia
+    const cardsToIndex = [];
+
     for (const card of cards) {
-        card.objectID = card.name.toLowerCase().replace(' ', '');
+        cardsToIndex.push({
+            // assign cards an objectID (note spelling) for algolia
+            name: card.name,
+            objectID: getCardSearchId(card.name),
+            flavorText: card.flavorText,
+            text: card.text,
+        });
     }
 
     const indexingService = new IndexingService();
-    await indexingService.addToIndex('cards', cards);
+    await indexingService.addToIndex('cards', cardsToIndex.slice(0, 5000));
 }
 
 (async () => {
     const cards = loadCardData();
-    await deleteAllCards();
-    await importCards(cards);
+    // await deleteAllCards();
+    // await importCards(cards);
     await createSearchIndex(cards);
 })();
